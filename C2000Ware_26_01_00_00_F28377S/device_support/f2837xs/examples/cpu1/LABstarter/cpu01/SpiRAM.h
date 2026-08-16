@@ -8,8 +8,8 @@
  * Define number of data points per variable  Default is 6000 points per variable
  * Change NUM_POINTS if you would like to save more data values per variable.
  * But if NUM_POINTS * 5(variables) greater than 65400 only 65400 points will be saved
- * LED16 Turns after all the data has been collected.  NOTE!!!!!  The given MATLAB functions only
- * work when LED16 is ON (Data collection done).
+ * LED GPIO21 Turns on after all the data has been collected.  NOTE!!!!!  The given MATLAB functions only
+ * work when LED GPIO21 is ON (Data collection done).
  * ############################################################################
  */
 

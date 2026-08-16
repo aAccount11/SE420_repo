@@ -90,6 +90,7 @@ void main(void)
     PieVectTable.SCIC_TX_INT = &TXCINT_data_sent;
 	PieVectTable.DMA_CH4_INT = &DMA_ISR;
     PieVectTable.SPIA_RX_INT = &SPIA_isr;//spia
+    PieVectTable.SPIC_RX_INT = &SPIC_isr;//spic
 
     PieVectTable.EMIF_ERROR_INT = &SWI_isr;
 
@@ -152,7 +153,6 @@ void main(void)
 	GPIO_SetupPinMux(78, GPIO_MUX_CPU1, 0);
 	GPIO_SetupPinOptions(78, GPIO_INPUT, GPIO_PULLUP | GPIO_QUAL6);
 	
-	InitSpiaGpio();
 	InitEPwm3Gpio();
 	InitEPwm8Gpio();
 
@@ -171,6 +171,7 @@ void main(void)
 	init_EQEPs();
 	InitDma();         // Set up DMA for SPI configuration
     setupSpia();       // Initialize the SPI only
+    setupSpic();
 	//
     // Ensure DMA is connected to Peripheral Frame 2 bridge (EALLOW protected)
     //
@@ -181,7 +182,7 @@ void main(void)
 
 	init_serialSCIA(&SerialA,115200);  // Matlab COM
 	
-	init_serialSCIB(&SerialB,115200);  //Simulink COM
+	init_serialSCIB(&SerialB,115200);  //BetterSerialPlotter or Simulink COM
 	
 	init_serialSCIC(&SerialC,19200); // For Text LCD
 
@@ -193,7 +194,7 @@ void main(void)
     // which is connected to CPU-Timer 1, and CPU int 14, which is connected
     // to CPU-Timer 2:  int 12 is for the SWI.  
     IER |= M_INT1;
-    IER |= M_INT6;
+    IER |= M_INT6; //SPIA and SPIC
     IER |= M_INT7;  //DMA
     IER |= M_INT8;  // SCIC SCID
     IER |= M_INT9;  // SCIA
@@ -205,7 +206,8 @@ void main(void)
 
     // Enable TINT0 in the PIE: Group 1 interrupt 7
     PieCtrlRegs.PIEIER1.bit.INTx7 = 1;
-	PieCtrlRegs.PIEIER6.bit.INTx1 = 1; //spia
+	PieCtrlRegs.PIEIER6.bit.INTx1 = 1; //spia rx
+    PieCtrlRegs.PIEIER6.bit.INTx9 = 1; //spic rx
     // Enable dma ch5 in the PIE: Group 7 interrupt 4
     PieCtrlRegs.PIEIER7.bit.INTx4 = 1;   // Enable PIE Group 7, INT 4 (DMA CH4)
     // Enable SWI in the PIE: Group 12 interrupt 9
@@ -226,6 +228,10 @@ void main(void)
             UART_printfLine(1,"Num T2:%ld",CpuTimer2.InterruptCount);
             UARTPrint = 0;
         }
+        // if (SendBetterSerialPlotter == 1 ) {
+        //     serialB_printf(&SerialB,"%.4f, %.4f, %.4f, %.4f\n\r",test1,test2,test3,test4);
+        //     SendBetterSerialPlotter = 0;
+        // }
     }
 }
 
@@ -298,6 +304,8 @@ __interrupt void cpu_timer2_isr(void)
         UARTPrint = 1;
     }
 }
+
+
 
 
 

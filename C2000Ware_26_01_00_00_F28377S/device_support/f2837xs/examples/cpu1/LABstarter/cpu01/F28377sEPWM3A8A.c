@@ -13,6 +13,7 @@
 #include "F28x_Project.h"     // Device Headerfile and Examples Include File
 #include <F28377sEPWM3A8A.h>
 
+int16_t DAN28027Garbage = 0;
 
 // this function has already been called for you in the main() function.  
 // It sets up PWM3A with a 20KHz carrier frequency PWM signal.  
@@ -123,4 +124,97 @@ void setEPWM8B(float u) {
     pwmVal = u * (pwmCountMax / 20.0) + pwmCountMax / 2.0;
 
     EPwm8Regs.CMPB.bit.CMPB = (int)pwmVal;
+}
+
+void setF28027EPWM(float controleffort){
+    int16_t EPwm1A_F28027 = 1500;
+    int16_t EPwm1B_F28027 = 1500;  // Not used right now.  Furuta only needs one PWM
+    if (controleffort < -10) {
+        controleffort = -10;
+    }
+    if (controleffort > 10) {
+        controleffort = 10;
+    }
+    float value = (controleffort+10)*3000.0/20.0;
+    EPwm1A_F28027 = (int16_t)value; 
+
+    SpicRegs.SPIFFRX.bit.RXFFIL = 3;
+    GpioDataRegs.GPCCLEAR.bit.GPIO65 = 1;
+    SpicRegs.SPITXBUF = 0x00DA;
+    SpicRegs.SPITXBUF = EPwm1A_F28027;
+    SpicRegs.SPITXBUF = EPwm1B_F28027;
+
+}
+
+void setupSpic(void) //Call this function in main() somewhere after the DINT; line of code.
+{
+    GPIO_SetupPinMux(65, GPIO_MUX_CPU1, 0); // Set as GPIO65 and used as DAN28027 SS
+    GPIO_SetupPinOptions(65, GPIO_OUTPUT, GPIO_PUSHPULL); // Make GPIO65 an Output Pin
+    GpioDataRegs.GPCSET.bit.GPIO65 = 1; //Initially Set GPIO65/SS High so DAN28027 is not selected
+
+    GPIO_SetupPinMux(69, GPIO_MUX_CPU1, 15); //Set GPIO69 pin to SPISIMOC
+    //Not using SPISOMIC  Just need to set PWM values on F28027  
+    GPIO_SetupPinMux(71, GPIO_MUX_CPU1, 15); //Set GPIO71 pin to SPICLKC
+
+    EALLOW;
+    GpioCtrlRegs.GPCPUD.bit.GPIO69 = 0; // Enable Pull-ups on SPI PINs Recommended by TI for SPI Pins
+    GpioCtrlRegs.GPCPUD.bit.GPIO71 = 0;
+    GpioCtrlRegs.GPCQSEL1.bit.GPIO69 = 3; // Set I/O pin to asynchronous mode recommended for SPI
+    GpioCtrlRegs.GPCQSEL1.bit.GPIO71 = 3; // Set I/O pin to asynchronous mode recommended for SPI
+    EDIS;
+
+    // ---------------------------------------------------------------------------
+    SpicRegs.SPICCR.bit.SPISWRESET = 0; // Put SPI in Reset
+
+    SpicRegs.SPICTL.bit.CLK_PHASE = 1; //This happens to be the mode for both the DAN28027 and
+    SpicRegs.SPICCR.bit.CLKPOLARITY = 0; //The MPU-9250, Mode 01.
+    SpicRegs.SPICTL.bit.MASTER_SLAVE = 1; // Set to SPI Master
+    SpicRegs.SPICCR.bit.SPICHAR = 0xF; // Set to transmit and receive 16-bits each write to SPITXBUF
+    SpicRegs.SPICTL.bit.TALK = 1; // Enable transmission
+    SpicRegs.SPIPRI.bit.FREE = 1; // Free run, continue SPI operation
+    SpicRegs.SPICTL.bit.SPIINTENA = 0; // Disables the SPI interrupt
+
+    SpicRegs.SPIBRR.bit.SPI_BIT_RATE = 49; // Set SCLK bit rate to 1 MHz so 1us period. SPI base clock is
+    // 50MHZ. And this setting divides that base clock to create SCLK’s period
+    SpicRegs.SPISTS.all = 0x0000; // Clear status flags just in case they are set for some reason
+
+    SpicRegs.SPIFFTX.bit.SPIRST = 1;// Pull SPI FIFO out of reset, SPI FIFO can resume transmit or receive.
+    SpicRegs.SPIFFTX.bit.SPIFFENA = 1; // Enable SPI FIFO enhancements
+    SpicRegs.SPIFFTX.bit.TXFIFO = 0; // Write 0 to reset the FIFO pointer to zero, and hold in reset
+    SpicRegs.SPIFFTX.bit.TXFFINTCLR = 1; // Write 1 to clear SPIFFTX[TXFFINT] flag just in case it is set
+
+    SpicRegs.SPIFFRX.bit.RXFIFORESET = 0; // Write 0 to reset the FIFO pointer to zero, and hold in reset
+    SpicRegs.SPIFFRX.bit.RXFFOVFCLR = 1; // Write 1 to clear SPIFFRX[RXFFOVF] just in case it is set
+    SpicRegs.SPIFFRX.bit.RXFFINTCLR = 1; // Write 1 to clear SPIFFRX[RXFFINT] flag just in case it is set
+    SpicRegs.SPIFFRX.bit.RXFFIENA = 1; // Enable the RX FIFO Interrupt. RXFFST >= RXFFIL
+
+    SpicRegs.SPIFFCT.bit.TXDLY = 16; //Set delay between transmits to 16 spi clocks. Needed by DAN28027 chip
+
+    SpicRegs.SPICCR.bit.SPISWRESET = 1; // Pull the SPI out of reset
+
+    SpicRegs.SPIFFTX.bit.TXFIFO = 1; // Release transmit FIFO from reset.
+    SpicRegs.SPIFFRX.bit.RXFIFORESET = 1; // Re-enable receive FIFO operation
+    //SpicRegs.SPICTL.bit.SPIINTENA = 1; // Enables SPI interrupt. !! I don’t think this is needed. Need to Test
+
+    SpicRegs.SPIFFRX.bit.RXFFIL =16; //Interrupt Level to 16 words or more received into FIFO causes interrupt. This is just the initial setting for the register. Will be changed below
+
+
+    // Clear SPIB interrupt source just in case it was issued due to any of the above initializations.
+    SpicRegs.SPIFFRX.bit.RXFFOVFCLR=1; // Clear Overflow flag
+    SpicRegs.SPIFFRX.bit.RXFFINTCLR=1; // Clear Interrupt flag
+    PieCtrlRegs.PIEACK.all = PIEACK_GROUP6;
+}
+
+__interrupt void SPIC_isr(void) {
+
+    GpioDataRegs.GPCSET.bit.GPIO65 = 1; // Pull CS high for DAN28027
+
+    DAN28027Garbage = SpicRegs.SPIRXBUF;
+    DAN28027Garbage = SpicRegs.SPIRXBUF;
+    DAN28027Garbage = SpicRegs.SPIRXBUF;
+
+    SpicRegs.SPIFFRX.bit.RXFFOVFCLR=1;  // Clear Overflow flag
+    SpicRegs.SPIFFRX.bit.RXFFINTCLR=1;  // Clear Interrupt flag
+    PieCtrlRegs.PIEACK.all = PIEACK_GROUP6;
+
 }

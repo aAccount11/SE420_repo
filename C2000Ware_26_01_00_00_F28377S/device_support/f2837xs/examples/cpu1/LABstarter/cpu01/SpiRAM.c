@@ -20,14 +20,12 @@ typedef union {
 //
 #pragma DATA_SECTION(spiBuf, ".my_arrs");    // map the TX data to memory
 uint16_t spiBuf[201];
-uint16_t spi_receive_Buf[201];
 float_int to_send[100];     // Send data buffer
 // in the data stream to check received data
 float_int write_address; //the address to write to
 float_int read_result;
 float_int read_address;
 volatile Uint16 *DMASource;
-volatile Uint16 *DMAreceivedest;
 int16_t DMAcount = 0;
 uint32_t SpiRAM_total_send = 0; //total number send
 uint16_t SpiRAM_dummy = 0;//for spi buf
@@ -67,62 +65,10 @@ void InitDma()
     EDIS;
 
     DMASource = (volatile Uint16 *)spiBuf;
-    DMAreceivedest = (volatile Uint16 *) spi_receive_Buf;
 
     EALLOW;
     //source and destination setting
-    //    DmaRegs.CH4.SRC_BEG_ADDR_SHADOW = (Uint32)DMASource;
-    DmaRegs.CH4.SRC_ADDR_SHADOW = (Uint32)&SpiaRegs.SPIRXBUF;
-    //    DmaRegs.CH4.DST_BEG_ADDR_SHADOW = (Uint32)&SpiaRegs.SPITXBUF;
-    DmaRegs.CH4.DST_ADDR_SHADOW = (Uint32)DMAreceivedest;
-
-    // burst setting
-    DmaRegs.CH4.BURST_SIZE.all = BURST;
-    DmaRegs.CH4.SRC_BURST_STEP = 0; //src is spiBuf
-    DmaRegs.CH4.DST_BURST_STEP = 1; //dest is SPITXBUF
-
-    //Transfer setting
-    DmaRegs.CH4.TRANSFER_SIZE = TRANSFER;
-    DmaRegs.CH4.SRC_TRANSFER_STEP = 0; //src is spiBuf
-    DmaRegs.CH4.DST_TRANSFER_STEP = 1; //dest is SPITXBUF
-    EDIS;
-
-    EALLOW;
-    DmaRegs.CH4.MODE.all = 0x8304; //good
-    // bit 15        1:      CHINTE, 0=interrupt disabled, 1=interrupt enabled
-    // bit 14        0:      DATASIZE, 0=16-bit, 1=32-bit
-    // bit 13-12     00:     reserved
-    // bit 11        0:      CONTINUOUS, 0=stop, 1=re-init after transfer complete
-    // bit 10        0:      ONESHOT, 0=one burst on trigger, 1=all bursts on trigger
-    // bit 9         1:      CHINTMODE, 0=start of transfer, 1=end of transfer
-    // bit 8         1:      PERINTE, peripheral interrupt trigger enable, 0=disabled, 1=enabled
-    // bit 7         0:      OVRINTE, overflow interrupt enable, 0=disabled, 1=enabled
-    // bit 6-5       00:     reserved
-    // bit 4-0       00005:  Set to channel number
-
-    DmaClaSrcSelRegs.DMACHSRCSEL1.bit.CH4 = 110; //SPIARX
-    DmaRegs.CH4.CONTROL.all = 0x0090; //good
-    // bit 15        0:      reserved
-    // bit 14        0:      OVRFLG, overflow flag, read-only
-    // bit 13        0:      RUNSTS, run status, read-only
-    // bit 12        0;      BURSTSTS, burst status, read-only
-    // bit 11        0:      TRANSFERSTS, transfer status, read-only
-    // bit 10-9      00:     reserved
-    // bit 8         0:      PERINTFLG, read-only
-    // bit 7         1:      ERRCLR, error clear, 0=no action, 1=clear SYNCERR bit
-    // bit 6-5       00:     reserved
-    // bit 4         1:      PERINTCLR, periph event clear, 0=no action, 1=clear periph event
-    // bit 3         0:      PERINTFRC, periph event force, 0=no action, 1=force periph event
-    // bit 2         0:      SOFTRESET, 0=no action, 1=soft reset the channel
-    // bit 1         0:      HALT, 0=no action, 1=halt the channel
-    // bit 0         0:      RUN, 0=no action, 1=enable the channel
-    EDIS;
-
-    EALLOW;
-    //source and destination setting
-    //    DmaRegs.CH5.SRC_BEG_ADDR_SHADOW = (Uint32)DMASource;
     DmaRegs.CH5.SRC_ADDR_SHADOW = (Uint32)DMASource;
-    //    DmaRegs.CH5.DST_BEG_ADDR_SHADOW = (Uint32)&SpiaRegs.SPITXBUF;
     DmaRegs.CH5.DST_ADDR_SHADOW = (Uint32)&SpiaRegs.SPITXBUF;
 
     // burst setting
@@ -168,7 +114,9 @@ void InitDma()
     EDIS;
 }
 
-float results[200];
+
+uint32_t num_in10 = 0;
+//float results[200];
 __interrupt void SPIA_isr(void){
     if (SpiRAM_spi_state == 1) { //this state empty the spirxbuf, write 4 things to spitxbuf to get the data at specified location
         SpiRAM_spi_state = 2;
@@ -183,8 +131,7 @@ __interrupt void SPIA_isr(void){
         SpiaRegs.SPITXBUF = read_address.parts[0];
         SpiaRegs.SPITXBUF = 0x0300;
         SpiaRegs.SPITXBUF = 0x0000;
-        SpiaRegs.SPITXBUF = 0x0000;
-        SpiaRegs.SPITXBUF = 0x0000;
+        
     } else if (SpiRAM_spi_state == 2) { //this state read 4 things back, only the latter two are important; then send 2 things to continuously get data
         SpiRAM_spi_state = 3;
         SpiRAM_dummy = SpiaRegs.SPIRXBUF;
@@ -213,9 +160,7 @@ __interrupt void SPIA_isr(void){
         SpiRAM_send_sci[2] = read_result.parts[1] & 0xFF;
         SpiRAM_send_sci[3] = (read_result.parts[1]>>8) & 0xFF;
         serial_sendSCIA(&SerialA, SpiRAM_send_sci, 4);
-        //            if (SpiRAM_spi_read_count < 100) {
-        results[SpiRAM_spi_read_count%200] = read_result.value;
-        //            }
+
         SpiRAM_spi_read_count++;
         SpiRAM_spi_total_read++;
 
@@ -226,14 +171,17 @@ __interrupt void SPIA_isr(void){
 
         } else {
             SpiRAM_spi_state = 10;
+            SpiaRegs.SPIFFRX.bit.RXFFIL = 1;
             GpioDataRegs.GPBSET.bit.GPIO61 = 1;
         }
-    } else if (SpiRAM_spi_state == 10) {//this state empty the spirxbuf
+    } else if (SpiRAM_spi_state == 10) {// Should not get into state 10  if we do mainly clear out fifo
+        num_in10++;
         SpiRAM_dummy =  SpiaRegs.SPIRXBUF;
         SpiRAM_dummy =  SpiaRegs.SPIRXBUF;
         SpiRAM_dummy =  SpiaRegs.SPIRXBUF;
         SpiRAM_dummy =  SpiaRegs.SPIRXBUF;
         SpiaRegs.SPIFFRX.bit.RXFFIL = 1;
+        GpioDataRegs.GPBSET.bit.GPIO61 = 1;
 
     }
     SpiaRegs.SPIFFRX.bit.RXFFOVFCLR=1; // Clear Overflow flag
@@ -250,7 +198,6 @@ __interrupt void DMA_ISR(void)
 
     PieCtrlRegs.PIEACK.all = PIEACK_GROUP7; // ACK to receive more interrupts
 
-//    GpioDataRegs.GPBSET.bit.GPIO61 = 1;
     ch5count++;
     return;
 }
@@ -293,8 +240,7 @@ void setupSpia(void) {
     SpiaRegs.SPIPRI.bit.FREE = 1;  // Free run, continue SPI operation
     SpiaRegs.SPICTL.bit.SPIINTENA = 0;  // Disables the SPI interrupt
 
-    SpiaRegs.SPIBRR.bit.SPI_BIT_RATE = 2; // Set SCLK bit rate to 1 MHz so 1us period.  SPI base clock is
-    // 50MHZ.  And this setting divides that base clock to create SCLK period
+    SpiaRegs.SPIBRR.bit.SPI_BIT_RATE = 2; // Set SCLK bit rate to /3 50/3 16.667 MHz.  SPI base clock is 50MHZ.
     SpiaRegs.SPISTS.all = 0x0000;  // Clear status flags just in case they are set for some reason
 
     SpiaRegs.SPIFFTX.bit.SPIRST = 1;// Pull SPI FIFO out of reset, SPI FIFO can resume transmit or receive.
@@ -308,7 +254,7 @@ void setupSpia(void) {
     SpiaRegs.SPIFFRX.bit.RXFFINTCLR = 1;    // Write 1 to clear SPIFFRX[RXFFINT] flag just in case it is set
     SpiaRegs.SPIFFRX.bit.RXFFIENA = 0;   // Disable the RX FIFO Interrupt because first DMA will be used to transfer to SPIRAM
 
-    SpiaRegs.SPIFFCT.bit.TXDLY = 0; //Set delay between transmits to 16 spi clocks. Needed by DAN28027 chip
+    SpiaRegs.SPIFFCT.bit.TXDLY = 0; //Set delay between transmits to 0
 
     SpiaRegs.SPICCR.bit.SPISWRESET = 1;    // Pull the SPI out of reset
 
@@ -321,14 +267,11 @@ void setupSpia(void) {
 
     SpiaRegs.SPIFFTX.all=0xE040;             // FIFOs enabled, TX FIFO released,
     SpiaRegs.SPIFFTX.bit.TXFFIL = FIFO_LVL;  // Set TX FIFO level
-    //    SpiaRegs.SPIFFTX.bit.TXFFIL = 1; //Interrupt Level to 16 words or more received into FIFO causes interrupt.  This is just the initial setting for the register.  Will be changed below
 
-    GpioDataRegs.GPBCLEAR.bit.GPIO61 = 1; //slave select low
     SpiaRegs.SPITXBUF = 0x0140; //write0x01 sequential mode(100 0000)
-
     while(SpiaRegs.SPIFFRX.bit.RXFFST !=1);
-    GpioDataRegs.GPBSET.bit.GPIO61 = 1;
     SpiRAM_temp = SpiaRegs.SPIRXBUF;
+    
     DELAY_US(20);
 
 }
@@ -377,10 +320,10 @@ void saveData(float val1, float val2, float val3, float val4, float val5){
                 spiBuf[2*i+2] = to_send[i].parts[0];
                 spiBuf[2*i+3] = to_send[i].parts[1];
             }
-//            GpioDataRegs.GPBCLEAR.bit.GPIO61 = 1;
+
             EALLOW;
             DmaRegs.CH5.CONTROL.bit.RUN = 1;
-            DmaRegs.CH4.CONTROL.bit.RUN = 1;
+            //DmaRegs.CH4.CONTROL.bit.RUN = 1;
             EDIS;     // Start SPI TX DMA channel
             SpiRAM_time_entered++;
         }

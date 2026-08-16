@@ -1,5 +1,5 @@
-#ifndef F28379DSERIAL_H_
-#define F28379DSERIAL_H_
+#ifndef F28377SSERIAL_H_
+#define F28377SSERIAL_H_
 #include <buffer.h>
 
 
@@ -34,11 +34,12 @@ extern serialSCIC_t SerialC;
 uint16_t init_serialSCIA(serialSCIA_t *s, uint32_t baud);
 void uninit_serialSCIA(serialSCIA_t *s);
 uint16_t serial_sendSCIA(serialSCIA_t *s, char *data, uint16_t len);
-uint16_t serial_printf(serialSCIA_t *s, char *fmt, ...);
+uint16_t serialA_printf(serialSCIA_t *s, char *fmt, ...);
 
 uint16_t init_serialSCIB(serialSCIB_t *s, uint32_t baud);
 void uninit_serialSCIB(serialSCIB_t *s);
 uint16_t serial_sendSCIB(serialSCIB_t *s, char *data, uint16_t len);
+uint16_t serialB_printf(serialSCIB_t *s, char *fmt, ...);
 
 uint16_t init_serialSCIC(serialSCIC_t *s, uint32_t baud);
 void uninit_serialSCIC(serialSCIC_t *s);

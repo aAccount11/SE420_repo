@@ -527,8 +527,6 @@ __interrupt void RXAINT_recv_ready(void)
             {
                 if (RXAdata == 0xDD)
                 {
-                    // Set to GPIO61 to manually move chip select high low when not using DMA.
-                    GPIO_SetupPinMux(61, GPIO_MUX_CPU1, 0);  // Set as GPIO61
                     SpiRAM_spi_state = 1;
 
                     SpiaRegs.SPIFFRX.bit.RXFIFORESET = 0;   // Write 0 to reset the FIFO pointer to zero, and hold in reset
@@ -536,6 +534,7 @@ __interrupt void RXAINT_recv_ready(void)
                     SpiaRegs.SPIFFRX.bit.RXFFINTCLR = 1;    // Write 1 to clear SPIFFRX[RXFFINT] flag just in case it is set
                     SpiaRegs.SPIFFRX.bit.RXFFIENA = 1;      // Enable the RX FIFO Interrupt.  RXFFST >= RXFFIL
                     SpiaRegs.SPIFFRX.bit.RXFIFORESET = 1;   // Re-enable receive FIFO operation
+                    SpiaRegs.SPIFFRX.bit.RXFFIL = 1;
                     GpioDataRegs.GPBCLEAR.bit.GPIO61 = 1;   // slave select low
                     SpiaRegs.SPITXBUF = 0x0540;             // write0x01 sequential mode(100 0000)
 
@@ -549,9 +548,9 @@ __interrupt void RXAINT_recv_ready(void)
                 else if (RXAdata == 0xBB)
                 {
                     SpiRAM_matlab_state = 0;
-                    SpiRAM_spi_state = 0;
+                    
                     SpiRAM_spi_read_count = 0;
-                    SpiaRegs.SPIFFRX.bit.RXFFIL = 2;
+                    
                 }
             }
             else if (SpiRAM_matlab_state == 10)
@@ -561,7 +560,7 @@ __interrupt void RXAINT_recv_ready(void)
                 {
                     SpiRAM_transmit_done = 0; // start transmitting
                     GpioDataRegs.GPACLEAR.bit.GPIO21 = 1;  // Turn off status LED for SPIRAM transfer
-                    SpiRAM_spi_state = 0;
+                    
                     SpiRAM_spi_read_count = 0;
                     SpiRAM_buf_len = 0;
                     SpiRAM_time_entered = 0;
@@ -789,7 +788,7 @@ __interrupt void RXCINT_recv_ready(void)
 // SerialA only setup for Tera Term connection
 char serial_printf_bufSCIA[BUF_SIZESCIA];
 
-uint16_t serial_printf(serialSCIA_t *s, char *fmt, ...)
+uint16_t serialA_printf(serialSCIA_t *s, char *fmt, ...)
 {
     va_list ap;
 
@@ -798,6 +797,20 @@ uint16_t serial_printf(serialSCIA_t *s, char *fmt, ...)
     va_end(ap);
 
     return serial_sendSCIA(s,serial_printf_bufSCIA,strlen(serial_printf_bufSCIA));
+}
+
+// SerialB for BetterSerialPlotter
+char serial_printf_bufSCIB[BUF_SIZESCIB];
+
+uint16_t serialB_printf(serialSCIB_t *s, char *fmt, ...)
+{
+    va_list ap;
+
+    va_start(ap,fmt);
+    vsprintf(serial_printf_bufSCIB,fmt,ap);
+    va_end(ap);
+
+    return serial_sendSCIB(s,serial_printf_bufSCIB,strlen(serial_printf_bufSCIB));
 }
 
 //For Text LCD  SCIC only

@@ -8,6 +8,9 @@ void initEPwm7A(void);
 void setEPWM7A(float u);
 void initEPwm8(void);
 void setEPWM8A(float u);
+__interrupt void SPIC_isr(void);
+void setupSpic(void);
+void setF28027EPWM(float controleffort);
 
 #endif /* __F28377SEPWM_H__ */
 

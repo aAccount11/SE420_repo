@@ -1,8 +1,12 @@
-function [part] = serialreadSPIRAMtest(comport)
+function [part] = serialreadSPIRAM(comport)
+% to use:
+% list_serialports  to find serial COM
+% then
+% data = serialreadSPIRAM('COM6')
+% It takes a number of seconds to read all the data stored to the SPI RAM chip
 
-% Check for existing serial port objects
 existingPorts = serialportfind();
-
+% Check for existing serial port objects
 % If any serial ports are found, clean them up
 if ~isempty(existingPorts)
     fprintf('length %f\n',length(existingPorts));
@@ -27,12 +31,11 @@ if (testifcom(comport) == 0)
     exception = MException('MATLAB:ComportNotFound','COM Port not found.');
     throw(exception);
 end
-%s = serial(comport);
+
+display('It takes a number of seconds to read all the data stored to the SPI RAM chip');
 s = serialport(comport,115200);
-%set(s,'BaudRate',115200);
 s.InputBufferSize = 150000;
 fopen(s);
-% s = comport;
 hex_str = 'AA55'; % header for reading data back from spiram
 char_str = char(sscanf(hex_str,'%2X').');
 fwrite(s,char_str);
@@ -52,15 +55,11 @@ while 1
                 fwrite(s,char_str);
             else 
                 out3 = [out3;fread(s,packet_size,'float32')];
-%                 if i ~= packet_number
                     hex_str = 'DD'; %end character for reading new a new packet
                     char_str = char(sscanf(hex_str,'%2X').');
                     fwrite(s,char_str);
-%                 end
             end
-        end
-%         out3 = fread(s,packet_size,'float32');%read each packet_size of floats a time
-        
+        end        
 % parse the data received based on the varible number
         for i=1:var_num
             temp=out3(i:var_num:end);
@@ -85,10 +84,8 @@ while 1
         break;
     end
 end
-hex_str = 'BB'; %end character for reading new a new packet
+hex_str = 'BB'; %end character for reading done
 char_str = char(sscanf(hex_str,'%2X').');
 fwrite(s,char_str);
 
-%fclose(s)
-%delete(s)
 clear s

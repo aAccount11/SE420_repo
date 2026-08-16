@@ -1,8 +1,10 @@
-%send the starting command to 
-function startCollecttest(comport)
+function restartCollect(comport)
+% to use:
+% to start another collection of SPIRAM data
+% restartCollect('COM6') or whatever COM port 'list_serialport'
 
-% Check for existing serial port objects
 existingPorts = serialportfind();
+% Check for existing serial port objects
 
 % If any serial ports are found, clean them up
 if ~isempty(existingPorts)
@@ -32,14 +34,10 @@ end
 hex_str = 'CC55'; % header
 char_str = char(sscanf(hex_str,'%2X').');
 
-% s = serial(comport);
 s = serialport(comport,115200);
-% set(s,'BaudRate',115200);
 s.InputBufferSize = 150000;
 fopen(s);
 fwrite(s,char_str);
 
 pause(2); 
-%fclose(s);
-%delete(s)
 clear s
