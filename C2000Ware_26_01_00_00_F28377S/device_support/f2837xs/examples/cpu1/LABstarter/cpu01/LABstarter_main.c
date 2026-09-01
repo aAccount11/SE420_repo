@@ -40,6 +40,8 @@ extern float SIMU_value4_16bit; // smaller float between -32 and 32 because 16bi
 
 // Count variables
 uint32_t numTimer0calls = 0;
+uint32_t numTimer1calls = 0;
+uint32_t numTimer2calls = 0;
 uint32_t numSWIcalls = 0;
 uint16_t UARTPrint = 0;
 uint32_t time = 0;
@@ -225,11 +227,11 @@ void main(void)
     while(1)
     {
         if (UARTPrint == 1 ) {
-            UART_printfLine(1,"Num T2:%ld",CpuTimer2.InterruptCount);
+            UART_printfLine(1,"Num T2:%ld",numTimer2calls);
             UARTPrint = 0;
         }
         // if (SendBetterSerialPlotter == 1 ) {
-        //     serialB_printf(&SerialB,"%.4f, %.4f, %.4f, %.4f\n\r",test1,test2,test3,test4);
+        //     serialB_printf(&SerialB,"%.4f %.4f %.4f %.4f\n\r",test1,test2,test3,test4);
         //     SendBetterSerialPlotter = 0;
         // }
     }
@@ -260,8 +262,6 @@ __interrupt void SWI_isr(void) {
 // cpu_timer0_isr - CPU Timer0 ISR
 __interrupt void cpu_timer0_isr(void)
 {
-    CpuTimer0.InterruptCount++;
-
     numTimer0calls++;
 
     //    if ((numTimer0calls%50) == 0) {
@@ -286,21 +286,19 @@ __interrupt void cpu_timer0_isr(void)
 __interrupt void cpu_timer1_isr(void)
 {
 
+	numTimer1calls++;
 
-    CpuTimer1.InterruptCount++;
 }
 
 // cpu_timer2_isr CPU Timer2 ISR
 __interrupt void cpu_timer2_isr(void)
 {
-
-
     // Blink LaunchPad Blue LED
     GpioDataRegs.GPATOGGLE.bit.GPIO13 = 1;
 
-    CpuTimer2.InterruptCount++;
+    numTimer2calls++;
 
-    if ((CpuTimer2.InterruptCount % 50) == 0) {
+    if ((numTimer2calls % 50) == 0) {
         UARTPrint = 1;
     }
 }
