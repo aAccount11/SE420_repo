@@ -14,3 +14,12 @@ tf10D = c2d(tf10,.001,'tustin');
 bsingle = single(tf10D.num{1});
 asingle = single(tf10D.den{1});
 tf10Dsingle = tf(bsingle,asingle,.001);
+
+tf500D4 = tf500D^4;
+tf100D4 = tf100D^4;
+tf10D4 = tf10D^4;
+
+
+bsingle = single(tf10D4.num{1});
+asingle = single(tf10D4.den{1});
+tf10D4single = tf(bsingle,asingle,0.001)

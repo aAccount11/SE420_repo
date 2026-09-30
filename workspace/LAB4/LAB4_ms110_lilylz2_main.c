@@ -54,6 +54,37 @@ float avgAdcb0 = 0;
 float avgAdcb1 = 0;
 float avgAdcb2 = 0;
 
+// TF500
+//float num[2]={	2.0000000000000001e-01,	2.0000000000000001e-01};
+//float den[2]={	1.0000000000000000e+00,	-5.9999999999999998e-01};
+
+// 100D
+//float num[2]={	4.7619047619047616e-02,	4.7619047619047616e-02};
+//float den[2]={	1.0000000000000000e+00,	-9.0476190476190477e-01};
+
+// 10D
+//float num[2]={	4.9751243781094526e-03,	4.9751243781094526e-03};
+//float den[2]={	1.0000000000000000e+00,	-9.9004975124378114e-01};
+
+// 10D4
+// the transfer function's numerator and denominator
+long double num[5]={	6.1265470106331452e-10L,	2.4506188042532581e-09L,	3.6759282063798873e-09L,	2.4506188042532581e-09L,	6.1265470106331452e-10L};
+long double den[5]={	1.0000000000000000e+00L,	-3.9601990049751246e+00L,	5.8811910596272376e+00L,	-3.8817811637340642e+00L,	9.6078911888442642e-01L};
+
+
+long double xk_0 = 0.0;
+long double xk_1 = 0.0;
+long double xk_2 = 0.0;
+long double xk_3 = 0.0;
+long double xk_4 = 0.0;
+
+
+long double yk_0 = 0.0;
+long double yk_1 = 0.0;
+long double yk_2 = 0.0;
+long double yk_3 = 0.0;
+long double yk_4 = 0.0;
+
 // Count variables
 uint32_t numTimer0calls = 0;
 uint32_t numTimer1calls = 0;
@@ -63,6 +94,7 @@ uint16_t UARTPrint = 0;
 uint32_t time = 0;
 extern uint16_t SpiRAM_total_data;
 uint32_t count100ms = 0;
+
 
 void SetupADCSOversampling(void) {
     uint16_t acqps;
@@ -236,7 +268,7 @@ void main(void) {
     EPwm5Regs.TBPHS.bit.TBPHS = 0x0000;        // Phase is 0
     EPwm5Regs.TBCTL.bit.PHSEN = TB_DISABLE;    // Disable phase loading
     EPwm5Regs.TBCTL.bit.CLKDIV = 0;            // divide by 1 50Mhz Clock
-    EPwm5Regs.TBPRD = 3125U;                   // (1/16)ms sample. U for unsigned
+    EPwm5Regs.TBPRD = 50000;                   // (1/16)ms sample. U for unsigned
     EPwm5Regs.ETSEL.bit.SOCAEN = 1;            // enable SOCA
     EPwm5Regs.TBCTL.bit.CTRMODE = TB_COUNT_UP; // unfreeze, and enter up count mode
     EDIS;
@@ -375,7 +407,7 @@ __interrupt void cpu_timer2_isr(void) {
 }
 
 // adcb1 pie interrupt
-__interrupt void ADCB_ISR(void) {
+/*__interrupt void ADCB_ISR(void) {
     adcb0result = AdcbResultRegs.ADCRESULT0;
     adcb1result = AdcbResultRegs.ADCRESULT1;
     adcb2result = AdcbResultRegs.ADCRESULT2;
@@ -398,9 +430,11 @@ __interrupt void ADCB_ISR(void) {
     }
     AdcbRegs.ADCINTFLGCLR.bit.ADCINT1 = 1; // clear interrupt flag
     PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
-}
+}*/
 
-/*
+
+
+
 __interrupt void ADCB_ISR (void)
 {
     adcb0result = AdcbResultRegs.ADCRESULT0;
@@ -411,10 +445,30 @@ __interrupt void ADCB_ISR (void)
     adcb1volt = (10.0 - 0.0)/(0.0 - 2048.0) * adcb1result + 10.0;
     adcb2volt = (3.0-0.0)/(4095.0 - 0.0) * adcb2result;
     // Here write ADCINB0’s voltage value to DAC1 channel
-    setDAC1(adcb0volt);
+    //xk_0 = adcb0volt;
+    //yk_0 = num[0]*xk_0 + num[1]*xk_1 - den[1]*yk_1; 
+    //setDAC1(yk_0);
+    //xk_1 = xk_0;
+    //yk_1 = yk_0;
+
+    // FILTER
+    xk_0 = adcb0volt;
+    yk_0 =
+        xk_4*num[4] + xk_3*num[3] + xk_2*num[2] + xk_1*num[1] + xk_0*num[0]
+        - den[1]*yk_1  - den[2]*yk_2 - den[3]*yk_3 - den[4]*yk_4;
+    xk_4 = xk_3;
+    xk_3 = xk_2;
+    xk_2 = xk_1;
+    xk_1 = xk_0;
+    yk_4 = yk_3;
+    yk_3 = yk_2;
+    yk_2 = yk_1;
+    yk_1 = yk_0;
+    // output
+    setDAC1(yk_0);
     // Print ADCINB0’s voltage to the text LCD every 100ms by setting UARTPrint to 1
     // and the function UART_printfLine is called in main()’s while(1) loop
     AdcbRegs.ADCINTFLGCLR.bit.ADCINT1 = 1; //clear interrupt flag
     PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
 }
-*/
+
