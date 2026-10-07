@@ -275,7 +275,7 @@ __interrupt void cpu_timer0_isr(void)
 	
 
     // Example for using the saveData function to save date to the SPIRAM for data collection to Matlab
-    //saveData(time*0.001,1.5*sin(2*PI*.5*time*.001),3*sin(2*PI*.5*time*.001),4*sin(2*PI*.5*time*.001),5*sin(2*PI*.5*time*.001));
+    //saveData(time*0.001,1.5*sin(2.0*PI*0.5*time*0.001),3.0*sin(2.0*PI*0.5*time*0.001),4.0*sin(2.0*PI*0.5*time*0.001),5.0*sin(2.0*PI*0.5*time*0.001));
     //time = time + 1;
 
     // Acknowledge this interrupt to receive more interrupts from group 1
