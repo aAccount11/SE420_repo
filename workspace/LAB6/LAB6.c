@@ -50,7 +50,7 @@ extern uint16_t SpiRAM_total_data;
 
 bool toggle = true;
 float ang_vel = 0.0f;
-float desired_value = 0.0f;
+float desired_value = 100.0f;
 float motor_pos = 0.0f;
 float motor_posK_1 = 0.0f;
 float err = 0.0f;
@@ -58,9 +58,13 @@ float err_old = 0.0f;
 float Ik = 0.0f;
 float Ik_old = 0.0f;
 float control_effort = 0.0f;
+float Vneg = 0.01249650924;
+float Cneg = -0.7983963039;
+float Vpos = 0.01226694045;
+float Cpos = 0.7532238193;
 const float T_val = 0.001;
-const float Kp = 0.05; // lower this guy (kp)
-const float Ki = 0.15;
+const float Kp = 0.07; // lower this guy (kp)
+const float Ki = 0.25;
 
 int16_t SendBetterSerialPlotter = 0;
 float motorVelocity = 0.0f;
@@ -334,6 +338,7 @@ __interrupt void cpu_timer2_isr(void)
         toggle = !toggle;
     }
 
+
     motor_pos = readEnc1();
     ang_vel = (motor_pos - motor_posK_1) / T_val; 
     motor_posK_1 = motor_pos;
@@ -352,6 +357,14 @@ __interrupt void cpu_timer2_isr(void)
     if( fabs( control_effort ) > 10 ){
         Ik = Ik_old * .99;
     }
+
+    if (motorVelocity > 0.0) {
+        control_effort = control_effort + Vpos * ang_vel + Cpos;
+    }
+    else {
+        control_effort = control_effort + Vneg * ang_vel + Cneg;
+    }
+
     setEPWM3A(control_effort);
     
     motorVelocity = ang_vel;
@@ -359,6 +372,8 @@ __interrupt void cpu_timer2_isr(void)
     controlEffort = control_effort;
     Ik_old = Ik;
     err_old = err;
+
+    
 
 
 }
