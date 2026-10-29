@@ -47,6 +47,40 @@ uint16_t UARTPrint = 0;
 uint32_t time = 0;
 extern uint16_t SpiRAM_total_data;
 
+float KP = 12.0f;
+float KD = 1.0f;
+float KI = 100.0f;
+
+
+float KP_1 = 12.0f;
+float KD_1 = 1.0f;
+
+float KP_2 = 12.0f;
+float KD_2 = 1.0f;
+float switch_point = 0.0f;
+
+
+float theta = 0.0f; // position
+float theta_old = 0.0f;
+float err = 0.0f;
+float err_dot = 0.0f;
+float err_dot_old = 0.0f;
+float theta_dot = 0.0f; // velocity
+float theta_dot_old = 0.0f;
+float u = 0.0f;
+float pp_control = 0.0f;;
+float desired_theta = 0.0f;
+float Ik = 0.0f;
+float Ik_old = 0.0f;
+float err_old = 0.0f;
+bool toggle = false;
+
+int16_t SendBetterSerialPlotter = 0;
+float motorPos = 0.0f;
+float referencePos = 0.0f;
+float controlEffort = 0.0f;
+
+
 void main(void)
 {
 
@@ -106,7 +140,7 @@ void main(void)
     // 200MHz CPU Freq, 			Period (in uSeconds)
     ConfigCpuTimer(&CpuTimer0, 200, 1000);
     ConfigCpuTimer(&CpuTimer1, 200, 20000);
-    ConfigCpuTimer(&CpuTimer2, 200, 40000);
+    ConfigCpuTimer(&CpuTimer2, 200, 1000);
 
     // Enable CpuTimer Interrupt bit TIE
     CpuTimer0Regs.TCR.all = 0x4000;
@@ -230,10 +264,10 @@ void main(void)
             UART_printfLine(1,"Num T2:%ld",numTimer2calls);
             UARTPrint = 0;
         }
-        // if (SendBetterSerialPlotter == 1 ) {
-        //     serialB_printf(&SerialB,"%.4f %.4f %.4f %.4f\n\r",test1,test2,test3,test4);
-        //     SendBetterSerialPlotter = 0;
-        // }
+        if (SendBetterSerialPlotter == 1 ) {
+            serialB_printf(&SerialB,"%.4f %.4f %.4f\n\r",motorPos,referencePos,controlEffort);
+            SendBetterSerialPlotter = 0;
+        }
     }
 }
 
@@ -293,10 +327,75 @@ __interrupt void cpu_timer1_isr(void)
 // cpu_timer2_isr CPU Timer2 ISR
 __interrupt void cpu_timer2_isr(void)
 {
+
+
     // Blink LaunchPad Blue LED
     GpioDataRegs.GPATOGGLE.bit.GPIO13 = 1;
 
     numTimer2calls++;
+
+
+    if( (numTimer2calls % 5) == 0 ){
+        SendBetterSerialPlotter  = 1;
+    }
+
+
+    if(  numTimer2calls % 4000 == 0 ){
+        toggle = ! toggle;
+        if( toggle == true ){
+            desired_theta = 1.f;
+        }
+        else {
+            desired_theta = -1.f;
+        }
+    }
+    
+
+    
+
+    theta = readEnc1();
+    err = desired_theta - theta;
+    theta_dot = 400.0f  * (theta - theta_old) + .6f * theta_dot_old;
+    err_dot = 400.0f  * (err - err_old) + .6f * err_dot_old;
+    Ik = (0.001 * (err + err_old) + 2.0*Ik_old) / 2.0 ;
+    // if it is close to set point
+    if( fabs(err_dot) < switch_point){
+        KP = KP_2;
+        KD = KD_2;
+        u =  KP*err + Ik*KI - KD * theta_dot;
+        if( fabs( u ) > 10 ){
+            Ik = Ik_old * .99;
+        }
+    }
+    else {
+        // if it is far away
+        KP = KP_1;
+        KD = KD_1;
+        Ik = 0;
+        u = KP*err - KD * theta_dot;
+    }
+    if( u > 10.0f ){
+        u = 10.0;
+    }
+    else if(u < -10.0f){
+        u = -10.0f;
+    }
+
+
+    
+    Ik_old = Ik;
+    err_old = err;
+    err_dot_old = err_dot;
+
+
+    motorPos = theta;
+    referencePos = desired_theta;
+    controlEffort = u;
+
+    theta_dot_old = theta_dot;
+    theta_old = theta;
+
+    setEPWM3A(u);
 
     if ((numTimer2calls % 50) == 0) {
         UARTPrint = 1;
