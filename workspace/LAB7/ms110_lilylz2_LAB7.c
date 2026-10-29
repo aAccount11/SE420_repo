@@ -362,7 +362,7 @@ __interrupt void cpu_timer2_isr(void)
     if( fabs(err_dot) < switch_point){
         KP = KP_2;
         KD = KD_2;
-        u =  KP*err + Ik*KI - KD * theta_dot;
+        u =  KP*err + Ik*KI - KD * theta_dot;  // PID
         if( fabs( u ) > 10 ){
             Ik = Ik_old * .99;
         }
@@ -372,7 +372,7 @@ __interrupt void cpu_timer2_isr(void)
         KP = KP_1;
         KD = KD_1;
         Ik = 0;
-        u = KP*err - KD * theta_dot;
+        u = KP*err - KD * theta_dot;  // PD
     }
     if( u > 10.0f ){
         u = 10.0;
