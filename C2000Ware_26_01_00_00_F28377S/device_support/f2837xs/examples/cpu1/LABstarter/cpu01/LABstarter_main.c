@@ -231,7 +231,7 @@ void main(void)
             UARTPrint = 0;
         }
         // if (SendBetterSerialPlotter == 1 ) {
-        //     serialB_printf(&SerialB,"%.4f %.4f %.4f %.4f\n\r",test1,test2,test3,test4);
+        //     serialB_printf(&SerialB,"%.4f %.4f %.4f %.4f\r\n",test1,test2,test3,test4);
         //     SendBetterSerialPlotter = 0;
         // }
     }
